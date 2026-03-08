@@ -16,7 +16,7 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img">
     <img src="https://img.shields.io/visual-studio-marketplace/i/anjaneykumar7.pdf2img?style=for-the-badge&color=3B82F6" alt="Installs">
   </a>
-  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/license-Closed%20Source-ef4444?style=for-the-badge" alt="License">
 </p>
 
 ---
@@ -86,4 +86,4 @@ Press `F5` in VS Code to launch the Extension Development Host.
 
 ## 📄 License
 
-MIT © [anjaneykumar7](https://github.com/anjaneykumar7)
+This is closed-source software. All rights reserved © [anjaneykumar7](https://github.com/anjaneykumar7). Unauthorized copying, modification, or distribution is strictly prohibited.
