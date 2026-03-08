@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Images — VS Code Extension | View PDFs as Image Galleries</title>
+    <meta name="description"
+        content="Convert PDF files to beautiful image galleries inside VS Code. Right-click to copy any page, zoom, navigate, and export — all without leaving your editor.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                            950: '#2e1065',
+                        },
+                        surface: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            800: '#1e1b2e',
+                            850: '#171425',
+                            900: '#0f0d1a',
+                            950: '#0a0812',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Animated gradient background */
+        .hero-gradient {
+            background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(124, 58, 237, 0.25), transparent),
+                radial-gradient(ellipse 60% 50% at 80% 50%, rgba(59, 130, 246, 0.12), transparent),
+                radial-gradient(ellipse 50% 40% at 20% 80%, rgba(139, 92, 246, 0.1), transparent);
+        }
+
+        /* Glassmorphism card */
+        .glass {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-strong {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Grid pattern overlay */
+        .grid-pattern {
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* Glow effects */
+        .glow-purple {
+            box-shadow: 0 0 60px rgba(124, 58, 237, 0.15), 0 0 120px rgba(124, 58, 237, 0.05);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 40px rgba(124, 58, 237, 0.3);
+        }
+
+        /* Animated floating */
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-12px);
+            }
+        }
+
+        .float-anim {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .float-anim-delay {
+            animation: float 6s ease-in-out 1.5s infinite;
+        }
+
+        /* Fade-in on scroll */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-up {
+            opacity: 0;
+            animation: fadeUp 0.8s ease-out forwards;
+        }
+
+        .delay-100 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-200 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-300 {
+            animation-delay: 0.3s;
+        }
+
+        .delay-400 {
+            animation-delay: 0.4s;
+        }
+
+        .delay-500 {
+            animation-delay: 0.5s;
+        }
+
+        .delay-600 {
+            animation-delay: 0.6s;
+        }
+
+        /* Shimmer effect on button */
+        @keyframes shimmer {
+            0% {
+                background-position: -200% center;
+            }
+
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        .btn-shimmer {
+            background-size: 200% auto;
+            animation: shimmer 3s linear infinite;
+        }
+
+        /* Gradient border */
+        .gradient-border {
+            position: relative;
+        }
+
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.4), rgba(59, 130, 246, 0.2), rgba(124, 58, 237, 0.1));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        /* Preview image glow */
+        .preview-glow {
+            box-shadow:
+                0 25px 60px -12px rgba(124, 58, 237, 0.25),
+                0 0 0 1px rgba(124, 58, 237, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* Pulse ring for the logo */
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.9);
+                opacity: 0.6;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+        }
+
+        .pulse-ring::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: inherit;
+            border: 2px solid rgba(124, 58, 237, 0.4);
+            animation: pulse-ring 3s ease-in-out infinite;
+        }
+
+        /* Feature icon hover */
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1) rotate(-3deg);
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.3);
+        }
+
+        .feature-card:hover {
+            border-color: rgba(124, 58, 237, 0.2);
+            transform: translateY(-4px);
+        }
+
+        /* Stats counter pill */
+        .stat-pill {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(124, 58, 237, 0.15);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f0d1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4c1d95;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6d28d9;
+        }
+    </style>
+</head>
+
+<body class="bg-surface-950 text-white font-sans antialiased overflow-x-hidden">
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-strong">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-3 group">
+                <div
+                    class="relative w-9 h-9 rounded-xl bg-gradient-to-br from-brand-600 to-blue-500 flex items-center justify-center pulse-ring transition-transform group-hover:scale-105">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                </div>
+                <span class="text-lg font-bold tracking-tight">
+                    <span class="text-white">pdf</span><span class="text-brand-400">2</span><span
+                        class="text-white">img</span>
+                </span>
+            </a>
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#features" class="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
+                <a href="#how-it-works" class="text-sm text-gray-400 hover:text-white transition-colors">How it
+                    works</a>
+                <a href="#install" class="text-sm text-gray-400 hover:text-white transition-colors">Install</a>
+            </div>
+            <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img" target="_blank"
+                class="hidden md:inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-brand-600 to-brand-500 text-sm font-semibold text-white hover:from-brand-500 hover:to-brand-400 transition-all shadow-lg shadow-brand-600/20 hover:shadow-brand-500/30 hover:scale-105">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Install Free
+            </a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-gradient grid-pattern relative min-h-screen flex items-center pt-24 pb-16">
+        <!-- Decorative orbs -->
+        <div class="absolute top-1/4 left-10 w-72 h-72 bg-brand-600/10 rounded-full blur-[120px] float-anim"></div>
+        <div class="absolute bottom-1/4 right-10 w-96 h-96 bg-blue-600/8 rounded-full blur-[140px] float-anim-delay">
+        </div>
+
+        <div class="max-w-7xl mx-auto px-6 w-full">
+            <div class="text-center max-w-4xl mx-auto mb-16">
+                <!-- Badge -->
+                <div
+                    class="fade-up inline-flex items-center gap-2 px-4 py-1.5 rounded-full stat-pill text-xs font-medium text-brand-300 mb-8">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                    VS Code Extension — Free & Open Source
+                </div>
+
+                <h1
+                    class="fade-up delay-100 text-5xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[0.95] mb-6">
+                    <span class="bg-gradient-to-r from-white via-white to-gray-400 bg-clip-text text-transparent">View
+                        PDFs as</span>
+                    <br>
+                    <span
+                        class="bg-gradient-to-r from-brand-400 via-brand-300 to-blue-400 bg-clip-text text-transparent glow-text">Image
+                        Galleries</span>
+                </h1>
+
+                <p class="fade-up delay-200 text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-10">
+                    Open any PDF directly in VS Code and browse pages as a beautiful image gallery.
+                    <span class="text-gray-300">Copy, zoom, navigate</span> — all without leaving your editor.
+                </p>
+
+                <div class="fade-up delay-300 flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img" target="_blank"
+                        class="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-brand-500 to-blue-500 btn-shimmer text-base font-bold text-white shadow-2xl shadow-brand-600/25 hover:shadow-brand-500/40 hover:scale-[1.03] transition-all">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Install on VS Code
+                        <span
+                            class="absolute inset-0 rounded-2xl bg-white/0 group-hover:bg-white/5 transition-colors"></span>
+                    </a>
+                    <a href="#features"
+                        class="inline-flex items-center gap-2 px-8 py-4 rounded-2xl glass text-base font-semibold text-gray-300 hover:text-white hover:border-brand-500/30 transition-all hover:scale-[1.03]">
+                        See Features
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M7 17l9.2-9.2M17 17V7H7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Hero Preview Image -->
+            <div class="fade-up delay-400 relative max-w-5xl mx-auto">
+                <div class="relative rounded-2xl overflow-hidden preview-glow gradient-border">
+                    <img src="../landing/preview.png"
+                        alt="PDF to Images extension preview showing a PDF opened as an image gallery in VS Code"
+                        class="w-full rounded-2xl" loading="eager">
+                    <!-- Top shine -->
+                    <div
+                        class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent">
+                    </div>
+                </div>
+                <!-- Floating badges -->
+                <div
+                    class="absolute -left-4 top-1/4 glass rounded-xl px-4 py-3 float-anim hidden lg:flex items-center gap-3 shadow-xl">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm font-semibold text-white">Right-Click Copy</div>
+                        <div class="text-xs text-gray-500">Copy any page instantly</div>
+                    </div>
+                </div>
+                <div
+                    class="absolute -right-4 top-2/3 glass rounded-xl px-4 py-3 float-anim-delay hidden lg:flex items-center gap-3 shadow-xl">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm font-semibold text-white">Zoom Controls</div>
+                        <div class="text-xs text-gray-500">Scale up to 300%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="relative py-32">
+        <div class="absolute inset-0 bg-gradient-to-b from-surface-950 via-surface-900 to-surface-950"></div>
+        <div class="relative max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20">
+                <div
+                    class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full stat-pill text-xs font-medium text-brand-300 mb-6">
+                    Powerful Features
+                </div>
+                <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+                    <span class="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Everything you
+                        need,</span>
+                    <br>
+                    <span class="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">right inside
+                        VS Code</span>
+                </h2>
+                <p class="text-gray-500 text-lg max-w-xl mx-auto">No external tools. No browser tabs. Just click a PDF
+                    and start working.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-600/20 to-brand-600/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.8">
+                            <rect x="3" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="3" width="7" height="7" rx="1" />
+                            <rect x="3" y="14" width="7" height="7" rx="1" />
+                            <rect x="14" y="14" width="7" height="7" rx="1" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Gallery View</h3>
+                    <p class="text-gray-500 leading-relaxed">PDF pages rendered as a responsive image grid. Browse
+                        visually instead of scrolling through text.</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Right-Click Copy</h3>
+                    <p class="text-gray-500 leading-relaxed">Copy any PDF page as an image to your clipboard with a
+                        single right-click. Perfect for presentations & docs.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Zoom Controls</h3>
+                    <p class="text-gray-500 leading-relaxed">Zoom in up to 300% to inspect fine details. Smooth scaling
+                        with crisp rendering at every level.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8">
+                            <path d="M15 3h6v6" />
+                            <path d="M9 21H3v-6" />
+                            <path d="M21 3l-7 7" />
+                            <path d="M3 21l7-7" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Page Navigation</h3>
+                    <p class="text-gray-500 leading-relaxed">Jump to any page instantly with built-in navigation. Works
+                        seamlessly with large multi-page documents.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 to-pink-500/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="1.8">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Native PDF Support</h3>
+                    <p class="text-gray-500 leading-relaxed">Click any .pdf file and it opens directly as a gallery.
+                        Registers as a custom editor — no commands needed.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="feature-card glass rounded-2xl p-8 transition-all duration-300 cursor-default group">
+                    <div
+                        class="feature-icon w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 flex items-center justify-center mb-6 transition-all duration-300">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="1.8">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-white">Save as Image</h3>
+                    <p class="text-gray-500 leading-relaxed">Export individual pages or the entire PDF as high-quality
+                        PNG images with one click.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how-it-works" class="relative py-32">
+        <div class="absolute inset-0 hero-gradient opacity-50"></div>
+        <div class="relative max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20">
+                <div
+                    class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full stat-pill text-xs font-medium text-brand-300 mb-6">
+                    Simple Workflow
+                </div>
+                <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+                    <span class="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Three
+                        steps.</span>
+                    <span class="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">That's
+                        it.</span>
+                </h2>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Step 1 -->
+                <div class="relative text-center group">
+                    <div
+                        class="w-20 h-20 rounded-3xl bg-gradient-to-br from-brand-600/20 to-brand-600/5 glass flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                        <span
+                            class="text-3xl font-black bg-gradient-to-br from-brand-400 to-blue-400 bg-clip-text text-transparent">1</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-white">Install the Extension</h3>
+                    <p class="text-gray-500 leading-relaxed">Search for <span class="text-brand-300 font-medium">"PDF to
+                            Images"</span> in the VS Code marketplace and hit install.</p>
+                    <!-- Connector line -->
+                    <div
+                        class="hidden md:block absolute top-10 left-[60%] w-[80%] h-px bg-gradient-to-r from-brand-600/30 to-transparent">
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="relative text-center group">
+                    <div
+                        class="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 glass flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                        <span
+                            class="text-3xl font-black bg-gradient-to-br from-blue-400 to-cyan-400 bg-clip-text text-transparent">2</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-white">Open a PDF</h3>
+                    <p class="text-gray-500 leading-relaxed">Click any <span
+                            class="text-blue-300 font-mono text-sm">.pdf</span> file in your workspace. It opens as a
+                        gallery automatically.</p>
+                    <div
+                        class="hidden md:block absolute top-10 left-[60%] w-[80%] h-px bg-gradient-to-r from-blue-500/30 to-transparent">
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="text-center group">
+                    <div
+                        class="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-500/20 to-green-500/5 glass flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                        <span
+                            class="text-3xl font-black bg-gradient-to-br from-green-400 to-emerald-400 bg-clip-text text-transparent">3</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-white">Copy, Zoom & Share</h3>
+                    <p class="text-gray-500 leading-relaxed">Right-click to copy, use zoom controls, or save pages as
+                        images. <span class="text-green-300 font-medium">Done.</span></p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="install" class="relative py-32">
+        <div class="absolute inset-0 bg-gradient-to-b from-surface-950 to-surface-900"></div>
+        <div class="relative max-w-4xl mx-auto px-6 text-center">
+            <div class="glass-strong rounded-[2rem] p-12 md:p-20 gradient-border glow-purple">
+                <div
+                    class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full stat-pill text-xs font-medium text-brand-300 mb-8">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                    Ready to get started?
+                </div>
+                <h2 class="text-4xl md:text-6xl font-black tracking-tight mb-6">
+                    <span class="bg-gradient-to-r from-white via-white to-gray-400 bg-clip-text text-transparent">Stop
+                        switching tabs.</span>
+                    <br>
+                    <span class="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">Start being
+                        productive.</span>
+                </h2>
+                <p class="text-gray-400 text-lg mb-10 max-w-lg mx-auto leading-relaxed">
+                    Install PDF to Images and view your PDFs the way they were meant to be seen — fast, visual, and
+                    integrated.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img" target="_blank"
+                        class="group relative inline-flex items-center gap-3 px-10 py-5 rounded-2xl bg-gradient-to-r from-brand-600 via-brand-500 to-blue-500 btn-shimmer text-lg font-bold text-white shadow-2xl shadow-brand-600/25 hover:shadow-brand-500/40 hover:scale-[1.03] transition-all">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Install Free on VS Code
+                    </a>
+                    <a href="https://github.com/anjaneykumar7/pdf2img" target="_blank"
+                        class="inline-flex items-center gap-2 px-8 py-5 rounded-2xl glass text-base font-semibold text-gray-300 hover:text-white transition-all hover:scale-[1.03]">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="relative border-t border-white/5 py-12">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-600 to-blue-500 flex items-center justify-center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-gray-400">
+                        pdf<span class="text-brand-400">2</span>img
+                    </span>
+                </div>
+                <p class="text-sm text-gray-600">
+                    Built with ❤️ by <a href="https://github.com/anjaneykumar7" target="_blank"
+                        class="text-brand-400 hover:text-brand-300 transition-colors">anjaneykumar7</a>
+                </p>
+                <div class="flex items-center gap-6">
+                    <a href="https://github.com/anjaneykumar7/pdf2img" target="_blank"
+                        class="text-gray-600 hover:text-white transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                        </svg>
+                    </a>
+                    <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img" target="_blank"
+                        class="text-gray-600 hover:text-white transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll animation observer -->
+    <script>
+        // Intersection Observer for fade-in animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-up');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        // Observe all feature cards and steps
+        document.querySelectorAll('.feature-card, #how-it-works .group, .glass-strong').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            observer.observe(el);
+        });
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Navbar opacity on scroll
+        const nav = document.querySelector('nav');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                nav.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            } else {
+                nav.style.borderBottom = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>
