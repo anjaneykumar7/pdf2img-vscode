@@ -86,10 +86,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Register the copy image context menu command
   const copyImageCommand = vscode.commands.registerCommand(
     "pdf2img.copyImage",
-    async () => {
-      if (PdfImagePanel.currentPanel) {
-        PdfImagePanel.currentPanel.triggerCopyImage();
-      }
+    async (args?: any) => {
+      PdfImagePanel.handleCopyImageCommand(args);
     },
   );
 

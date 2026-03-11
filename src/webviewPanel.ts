@@ -2,9 +2,30 @@ import * as vscode from "vscode";
 
 export class PdfImagePanel {
   public static currentPanel: PdfImagePanel | undefined;
+  public static panels: PdfImagePanel[] = [];
+
   private readonly _panel: vscode.WebviewPanel;
   private readonly _context: vscode.ExtensionContext;
   private _disposables: vscode.Disposable[] = [];
+
+  public get isActive(): boolean {
+    return this._panel.active;
+  }
+
+  public static handleCopyImageCommand(args?: any) {
+    // If we have panels, broadcast the copy command to all of them.
+    // The webview script will only react if `lastHoveredImageDataUrl` is set,
+    // which guarantees only the panel where the user actually right-clicked will copy.
+    if (PdfImagePanel.panels.length > 0) {
+      PdfImagePanel.panels.forEach((p) => p.triggerCopyImage());
+    } else if (PdfImagePanel.currentPanel) {
+      PdfImagePanel.currentPanel.triggerCopyImage();
+    } else {
+      vscode.window.showErrorMessage(
+        "No active PDF image panel found to copy from.",
+      );
+    }
+  }
 
   public static createOrShow(
     context: vscode.ExtensionContext,
@@ -38,6 +59,7 @@ export class PdfImagePanel {
     );
 
     PdfImagePanel.currentPanel = new PdfImagePanel(panel, context);
+    PdfImagePanel.panels.push(PdfImagePanel.currentPanel);
     PdfImagePanel.currentPanel._update(pdfFileName, pdfDocumentUri);
   }
 
@@ -61,6 +83,7 @@ export class PdfImagePanel {
 
     const instance = new PdfImagePanel(panel, context);
     PdfImagePanel.currentPanel = instance;
+    PdfImagePanel.panels.push(instance);
     instance._update(pdfFileName, pdfDocumentUri);
   }
 
@@ -103,9 +126,43 @@ export class PdfImagePanel {
   }
 
   private async _copyImageToClipboard(dataUrl: string) {
-    vscode.window.showInformationMessage(
-      "Copying images directly to clipboard is currently undergoing an update. Please use 'Save Image' for now.",
-    );
+    try {
+      const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+
+      const path = require("path");
+      const fs = require("fs");
+      const { exec } = require("child_process");
+
+      // Ensure global storage exists
+      await vscode.workspace.fs.createDirectory(this._context.globalStorageUri);
+
+      const tempFilePath = vscode.Uri.joinPath(
+        this._context.globalStorageUri,
+        `pdf2img_copy_${Date.now()}.png`,
+      ).fsPath;
+      fs.writeFileSync(tempFilePath, buffer);
+
+      const command = `osascript -e 'set the clipboard to (read (POSIX file "${tempFilePath}") as JPEG picture)'`;
+
+      exec(command, (error: any, stdout: string, stderr: string) => {
+        if (error || stderr) {
+          vscode.window.showErrorMessage(
+            `Copy failed: ${error?.message || ""} ${stderr || ""}`,
+          );
+        } else {
+          vscode.window.showInformationMessage("✅ Image copied to clipboard!");
+        }
+        // Clean up the temp file after copying
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(tempFilePath);
+          } catch (e) {}
+        }, 1500);
+      });
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Failed to process image: ${e.message}`);
+    }
   }
 
   private async _saveImage(dataUrl: string, pageNumber: number) {
@@ -168,7 +225,11 @@ export class PdfImagePanel {
   }
 
   public dispose() {
-    PdfImagePanel.currentPanel = undefined;
+    if (PdfImagePanel.currentPanel === this) {
+      PdfImagePanel.currentPanel = undefined;
+    }
+    PdfImagePanel.panels = PdfImagePanel.panels.filter((p) => p !== this);
+
     this._panel.dispose();
     while (this._disposables.length) {
       const d = this._disposables.pop();
@@ -622,9 +683,10 @@ export class PdfImagePanel {
       vscode.postMessage({ command: 'error', text: 'Failed to render PDF: ' + (err.message || err) });
     }
 
-    async function processPdfData(uint8Array) {
+    async function processPdfData(pdfDataArray) {
       try {
         document.getElementById('loadingText').textContent = 'Loading getDocument...';
+        const uint8Array = new Uint8Array(pdfDataArray);
         const task = pdfjsLib.getDocument({ data: uint8Array, standardFontDataUrl: '${webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, "node_modules", "pdfjs-dist", "standard_fonts"))}/' });
         const pdf = await task.promise;
         const numPages = pdf.numPages;

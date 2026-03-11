@@ -2,7 +2,7 @@
   "name": "pdf2img",
   "displayName": "PDF to Images",
   "description": "Convert PDF files to images and copy any page image with right-click",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "license": "SEE LICENSE IN LICENSE",
   "publisher": "anjaneykumar",
   "repository": {
