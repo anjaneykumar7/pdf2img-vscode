@@ -1,7 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
-import * as os from "os";
 
 export class PdfImagePanel {
   public static currentPanel: PdfImagePanel | undefined;
@@ -12,13 +9,13 @@ export class PdfImagePanel {
   public static createOrShow(
     context: vscode.ExtensionContext,
     pdfFileName: string,
-    base64Pdf: string,
+    pdfDocumentUri: vscode.Uri,
   ) {
     const column = vscode.ViewColumn.One;
 
     if (PdfImagePanel.currentPanel) {
       PdfImagePanel.currentPanel._panel.reveal(column);
-      PdfImagePanel.currentPanel._update(pdfFileName, base64Pdf);
+      PdfImagePanel.currentPanel._update(pdfFileName, pdfDocumentUri);
       return;
     }
 
@@ -41,7 +38,7 @@ export class PdfImagePanel {
     );
 
     PdfImagePanel.currentPanel = new PdfImagePanel(panel, context);
-    PdfImagePanel.currentPanel._update(pdfFileName, base64Pdf);
+    PdfImagePanel.currentPanel._update(pdfFileName, pdfDocumentUri);
   }
 
   /**
@@ -51,7 +48,7 @@ export class PdfImagePanel {
     context: vscode.ExtensionContext,
     panel: vscode.WebviewPanel,
     pdfFileName: string,
-    base64Pdf: string,
+    pdfDocumentUri: vscode.Uri,
   ) {
     // Configure the webview panel
     panel.webview.options = {
@@ -64,7 +61,7 @@ export class PdfImagePanel {
 
     const instance = new PdfImagePanel(panel, context);
     PdfImagePanel.currentPanel = instance;
-    instance._update(pdfFileName, base64Pdf);
+    instance._update(pdfFileName, pdfDocumentUri);
   }
 
   private constructor(
@@ -106,89 +103,9 @@ export class PdfImagePanel {
   }
 
   private async _copyImageToClipboard(dataUrl: string) {
-    try {
-      const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-
-      const tmpFile = path.join(os.tmpdir(), `pdf2img_copy_${Date.now()}.png`);
-      fs.writeFileSync(tmpFile, buffer);
-
-      const { exec } = require("child_process");
-      const platform = process.platform;
-
-      const cleanup = () => {
-        try {
-          fs.unlinkSync(tmpFile);
-        } catch {}
-      };
-
-      if (platform === "darwin") {
-        // Write AppleScript to a temp file to avoid Unicode «» encoding issues with exec()
-        const scriptFile = path.join(
-          os.tmpdir(),
-          `pdf2img_copy_${Date.now()}.applescript`,
-        );
-        fs.writeFileSync(
-          scriptFile,
-          `set the clipboard to (read (POSIX file "${tmpFile}") as \u00ABclass PNGf\u00BB)`,
-          "utf8",
-        );
-
-        exec(
-          `osascript "${scriptFile}"`,
-          (error: any, _stdout: string, stderr: string) => {
-            if (error) {
-              console.error("Clipboard copy error:", error, stderr);
-              vscode.window.showErrorMessage(
-                "Failed to copy image to clipboard",
-              );
-            } else {
-              vscode.window.showInformationMessage(
-                "✅ Image copied to clipboard!",
-              );
-            }
-            cleanup();
-            try {
-              fs.unlinkSync(scriptFile);
-            } catch {}
-          },
-        );
-      } else if (platform === "win32") {
-        exec(
-          `powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('${tmpFile}'))"`,
-          (error: any) => {
-            if (error) {
-              vscode.window.showErrorMessage(
-                "Failed to copy image to clipboard",
-              );
-            } else {
-              vscode.window.showInformationMessage(
-                "✅ Image copied to clipboard!",
-              );
-            }
-            cleanup();
-          },
-        );
-      } else {
-        exec(
-          `xclip -selection clipboard -t image/png -i "${tmpFile}"`,
-          (error: any) => {
-            if (error) {
-              vscode.window.showErrorMessage(
-                "Failed to copy image. Make sure xclip is installed.",
-              );
-            } else {
-              vscode.window.showInformationMessage(
-                "✅ Image copied to clipboard!",
-              );
-            }
-            cleanup();
-          },
-        );
-      }
-    } catch (error) {
-      vscode.window.showErrorMessage("Failed to copy image to clipboard");
-    }
+    vscode.window.showInformationMessage(
+      "Copying images directly to clipboard is currently undergoing an update. Please use 'Save Image' for now.",
+    );
   }
 
   private async _saveImage(dataUrl: string, pageNumber: number) {
@@ -216,22 +133,38 @@ export class PdfImagePanel {
     });
 
     if (folderUri && folderUri[0]) {
-      const folder = folderUri[0].fsPath;
+      const folder = folderUri[0];
       for (const page of pages) {
         const base64Data = page.dataUrl.replace(/^data:image\/png;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-        const filePath = path.join(folder, `page_${page.pageNumber}.png`);
-        fs.writeFileSync(filePath, buffer);
+        const filePath = vscode.Uri.joinPath(
+          folder,
+          `page_${page.pageNumber}.png`,
+        );
+        await vscode.workspace.fs.writeFile(filePath, buffer);
       }
       vscode.window.showInformationMessage(
-        `✅ All ${pages.length} pages saved to ${folder}`,
+        `✅ All ${pages.length} pages saved to ${folder.path}`,
       );
     }
   }
 
-  private _update(pdfFileName: string, base64Pdf: string) {
+  private async _update(pdfFileName: string, pdfDocumentUri: vscode.Uri) {
     this._panel.title = `PDF Images: ${pdfFileName}`;
-    this._panel.webview.html = this._getHtmlForWebview(pdfFileName, base64Pdf);
+    this._panel.webview.html = this._getHtmlForWebview(
+      pdfFileName,
+      pdfDocumentUri,
+    );
+
+    try {
+      const pdfData = await vscode.workspace.fs.readFile(pdfDocumentUri);
+      this._panel.webview.postMessage({
+        command: "pdfData",
+        data: Array.from(pdfData),
+      });
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to read PDF file: ${e}`);
+    }
   }
 
   public dispose() {
@@ -245,7 +178,10 @@ export class PdfImagePanel {
     }
   }
 
-  private _getHtmlForWebview(pdfFileName: string, base64Pdf: string): string {
+  private _getHtmlForWebview(
+    pdfFileName: string,
+    pdfDocumentUri: vscode.Uri,
+  ): string {
     const webview = this._panel.webview;
     const nonce = getNonce();
 
@@ -274,7 +210,7 @@ export class PdfImagePanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: ${webview.cspSource} blob:; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}' ${webview.cspSource}; worker-src blob: ${webview.cspSource}; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: ${webview.cspSource} blob:; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}' ${webview.cspSource}; worker-src blob: ${webview.cspSource}; font-src ${webview.cspSource}; connect-src ${webview.cspSource};">
   <style nonce="${nonce}">
     :root {
       --bg-primary: #0d1117;
@@ -611,22 +547,86 @@ export class PdfImagePanel {
   <div id="pageNavContainer"></div>
   <div class="toast" id="toast"></div>
 
+  <script type="importmap" nonce="${nonce}">
+    { "imports": { "pdfjs": "${pdfjsBuildUri}" } }
+  </script>
   <script nonce="${nonce}" type="module">
+    import * as pdfjsLib from 'pdfjs';
     const vscode = acquireVsCodeApi();
 
-    // Import pdf.js
-    const pdfjsLib = await import('${pdfjsBuildUri}');
+    // Set worker source
     pdfjsLib.GlobalWorkerOptions.workerSrc = '${pdfjsWorkerUri}';
-
-    const base64Pdf = '${base64Pdf}';
-    const pdfData = Uint8Array.from(atob(base64Pdf), c => c.charCodeAt(0));
 
     const renderedPages = []; // { pageNumber, dataUrl }
     let lastHoveredImageDataUrl = null;
 
+    function createSvgIcon(pathD) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '16');
+      svg.setAttribute('height', '16');
+      svg.setAttribute('viewBox', '0 0 16 16');
+      svg.setAttribute('fill', 'currentColor');
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', pathD);
+      svg.appendChild(p);
+      return svg;
+    }
+
     async function renderPdf() {
       try {
-        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+        window.addEventListener('unhandledrejection', function(event) {
+          const errContainer = document.getElementById('loadingContainer');
+          errContainer.textContent = '';
+          const errDiv = document.createElement('div');
+          errDiv.style.cssText = 'color:#f85149;font-size:16px;';
+          errDiv.textContent = 'Unhandled Promise Rejection: ' + (event.reason && event.reason.message ? event.reason.message : event.reason);
+          errContainer.appendChild(errDiv);
+          vscode.postMessage({ command: 'error', text: 'Unhandled Rejection: ' + event.reason });
+        });
+
+        window.addEventListener('error', function(event) {
+          const errContainer = document.getElementById('loadingContainer');
+          errContainer.textContent = '';
+          const errDiv = document.createElement('div');
+          errDiv.style.cssText = 'color:#f85149;font-size:16px;';
+          errDiv.textContent = 'Window Error: ' + event.message;
+          errContainer.appendChild(errDiv);
+          vscode.postMessage({ command: 'error', text: 'Window Error: ' + event.message });
+        });
+
+        document.getElementById('loadingText').textContent = 'Loading PDF worker...';
+        
+        try {
+          const workerRes = await fetch('${pdfjsWorkerUri}');
+          const workerText = await workerRes.text();
+          const workerBlob = new Blob([workerText], { type: 'text/javascript' });
+          const workerUrl = URL.createObjectURL(workerBlob);
+          pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(workerUrl, { type: 'module' });
+        } catch (e) {
+          vscode.postMessage({ command: 'error', text: 'Worker fetch error: ' + e });
+        }
+        
+        document.getElementById('loadingText').textContent = 'Waiting for PDF data...';
+      } catch (err) {
+        showError(err);
+      }
+    }
+
+    function showError(err) {
+      const errContainer = document.getElementById('loadingContainer');
+      errContainer.textContent = '';
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'color:#f85149;font-size:16px;';
+      errDiv.textContent = 'Failed to render PDF: ' + (err.message || err);
+      errContainer.appendChild(errDiv);
+      vscode.postMessage({ command: 'error', text: 'Failed to render PDF: ' + (err.message || err) });
+    }
+
+    async function processPdfData(uint8Array) {
+      try {
+        document.getElementById('loadingText').textContent = 'Loading getDocument...';
+        const task = pdfjsLib.getDocument({ data: uint8Array, standardFontDataUrl: '${webview.asWebviewUri(vscode.Uri.joinPath(this._context.extensionUri, "node_modules", "pdfjs-dist", "standard_fonts"))}/' });
+        const pdf = await task.promise;
         const numPages = pdf.numPages;
 
         document.getElementById('pageCount').textContent = numPages + ' page' + (numPages !== 1 ? 's' : '') + ' converted';
@@ -657,34 +657,48 @@ export class PdfImagePanel {
           card.className = 'image-card';
           card.id = 'page-' + i;
           card.style.animationDelay = (i * 0.05) + 's';
-          card.innerHTML = \`
-            <div class="card-header">
-              <span class="page-badge">Page \${i}</span>
-              <div class="card-actions">
-                <button class="icon-btn" data-action="save" data-page="\${i}" title="Save Image">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 12l-4-4h2.5V3h3v5H12L8 12zM2 14h12v1H2v-1z"/>
-                  </svg>
-                </button>
-                <button class="icon-btn" data-action="copy" data-page="\${i}" title="Copy Image">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M4 4l1-1h6l1 1v6l-1 1H5l-1-1V4zm-2 2l1-1v8l1 1h8l1 1H3l-1-1V6z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="image-wrapper" data-vscode-context='{"webviewSection": "image", "pageNumber": \${i}, "preventDefaultContextMenuItems": true}'>
-              <img src="\${dataUrl}" alt="Page \${i}" />
-            </div>
-          \`;
+          // Build card header
+          const cardHeader = document.createElement('div');
+          cardHeader.className = 'card-header';
+          const pageBadge = document.createElement('span');
+          pageBadge.className = 'page-badge';
+          pageBadge.textContent = 'Page ' + i;
+          const cardActions = document.createElement('div');
+          cardActions.className = 'card-actions';
+          const saveBtn = document.createElement('button');
+          saveBtn.className = 'icon-btn';
+          saveBtn.setAttribute('data-action', 'save');
+          saveBtn.setAttribute('data-page', String(i));
+          saveBtn.title = 'Save Image';
+          saveBtn.appendChild(createSvgIcon('M8 12l-4-4h2.5V3h3v5H12L8 12zM2 14h12v1H2v-1z'));
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'icon-btn';
+          copyBtn.setAttribute('data-action', 'copy');
+          copyBtn.setAttribute('data-page', String(i));
+          copyBtn.title = 'Copy Image';
+          copyBtn.appendChild(createSvgIcon('M4 4l1-1h6l1 1v6l-1 1H5l-1-1V4zm-2 2l1-1v8l1 1h8l1 1H3l-1-1V6z'));
+          cardActions.appendChild(saveBtn);
+          cardActions.appendChild(copyBtn);
+          cardHeader.appendChild(pageBadge);
+          cardHeader.appendChild(cardActions);
+          // Build image wrapper
+          const imgWrapper = document.createElement('div');
+          imgWrapper.className = 'image-wrapper';
+          imgWrapper.setAttribute('data-vscode-context', JSON.stringify({webviewSection: 'image', pageNumber: i, preventDefaultContextMenuItems: true}));
+          const img = document.createElement('img');
+          img.src = dataUrl;
+          img.alt = 'Page ' + i;
+          imgWrapper.appendChild(img);
+          card.appendChild(cardHeader);
+          card.appendChild(imgWrapper);
 
           // Attach event listeners (CSP blocks inline onclick)
           card.querySelector('[data-action="save"]').addEventListener('click', () => saveImage(i));
           card.querySelector('[data-action="copy"]').addEventListener('click', () => copyImg(i));
 
           // Track hover for context menu
-          const imgWrapper = card.querySelector('.image-wrapper');
-          imgWrapper.addEventListener('mouseenter', () => {
+          const hoverWrapper = card.querySelector('.image-wrapper');
+          hoverWrapper.addEventListener('mouseenter', () => {
             lastHoveredImageDataUrl = dataUrl;
           });
 
@@ -699,20 +713,20 @@ export class PdfImagePanel {
 
         // Build page nav
         if (numPages > 3) {
-          let navHtml = '<div class="page-nav" id="pageNav">';
+          const navContainer = document.getElementById('pageNavContainer');
+          const navDiv = document.createElement('div');
+          navDiv.className = 'page-nav';
+          navDiv.id = 'pageNav';
           for (let i = 1; i <= numPages; i++) {
-            navHtml += '<button class="page-dot" data-page="' + i + '" title="Page ' + i + '">' + i + '</button>';
+            const dot = document.createElement('button');
+            dot.className = 'page-dot';
+            dot.setAttribute('data-page', String(i));
+            dot.title = 'Page ' + i;
+            dot.textContent = String(i);
+            dot.addEventListener('click', () => scrollToPage(i));
+            navDiv.appendChild(dot);
           }
-          navHtml += '</div>';
-          document.getElementById('pageNavContainer').innerHTML = navHtml;
-
-          // Attach click listeners to page dots (CSP blocks inline onclick)
-          document.querySelectorAll('.page-dot').forEach(dot => {
-            dot.addEventListener('click', () => {
-              const pageNum = parseInt(dot.getAttribute('data-page'));
-              scrollToPage(pageNum);
-            });
-          });
+          navContainer.appendChild(navDiv);
 
           // Intersection observer
           const observer = new IntersectionObserver((entries) => {
@@ -727,8 +741,13 @@ export class PdfImagePanel {
         }
 
       } catch (err) {
-        document.getElementById('loadingContainer').innerHTML = '<div style="color:#f85149;font-size:16px;">❌ Failed to render PDF: ' + err.message + '</div>';
-        vscode.postMessage({ command: 'error', text: 'Failed to render PDF: ' + err.message });
+        const errContainer = document.getElementById('loadingContainer');
+        errContainer.textContent = '';
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = 'color:#f85149;font-size:16px;';
+        errDiv.textContent = 'Failed to render PDF: ' + (err.message || err);
+        errContainer.appendChild(errDiv);
+        vscode.postMessage({ command: 'error', text: 'Failed to render PDF: ' + (err.message || err) });
       }
     }
 
@@ -753,22 +772,9 @@ export class PdfImagePanel {
       const page = renderedPages.find(p => p.pageNumber === pageNum);
       if (!page) return;
 
-      showToast('Copying image to clipboard...');
+      showToast('Copying image...');
 
-      // Try browser Clipboard API first
-      try {
-        const response = await fetch(page.dataUrl);
-        const blob = await response.blob();
-        await navigator.clipboard.write([
-          new ClipboardItem({ [blob.type]: blob })
-        ]);
-        showToast('✅ Image copied to clipboard!');
-        return;
-      } catch (e) {
-        console.log('Clipboard API not available, using extension fallback');
-      }
-
-      // Fallback to extension-side clipboard
+      // Send to extension host for clipboard handling
       vscode.postMessage({ command: 'copyImage', dataUrl: page.dataUrl });
     }
 
@@ -802,16 +808,18 @@ export class PdfImagePanel {
       document.getElementById('imageGrid').style.setProperty('--card-width', val + 'px');
     });
 
-    // Handle context menu copy from extension
+    // Handle context menu copy and raw data loading from extension
     window.addEventListener('message', (event) => {
       const message = event.data;
       if (message.command === 'contextCopyImage' && lastHoveredImageDataUrl) {
         vscode.postMessage({ command: 'copyImage', dataUrl: lastHoveredImageDataUrl });
         showToast('Copying image to clipboard...');
+      } else if (message.command === 'pdfData') {
+        processPdfData(message.data);
       }
     });
 
-    // Start rendering
+    // Start rendering (initializes worker and waits for data)
     renderPdf();
   </script>
 </body>

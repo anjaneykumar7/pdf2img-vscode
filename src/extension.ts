@@ -1,6 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
 import { PdfImagePanel } from "./webviewPanel";
 
 class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
@@ -19,18 +17,14 @@ class PdfEditorProvider implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken,
   ): Promise<void> {
-    const pdfPath = document.uri.fsPath;
-    const pdfFileName = path.basename(pdfPath);
+    const pdfFileName = document.uri.path.split("/").pop() || "document.pdf";
 
     try {
-      const pdfData = fs.readFileSync(pdfPath);
-      const base64Pdf = pdfData.toString("base64");
-
       PdfImagePanel.initFromExistingPanel(
         this.context,
         webviewPanel,
         pdfFileName,
-        base64Pdf,
+        document.uri,
       );
     } catch (error: any) {
       vscode.window.showErrorMessage(
@@ -77,13 +71,10 @@ export function activate(context: vscode.ExtensionContext) {
         pdfUri = selected[0];
       }
 
-      const pdfPath = pdfUri.fsPath;
-      const pdfFileName = path.basename(pdfPath);
+      const pdfFileName = pdfUri.path.split("/").pop() || "document.pdf";
 
       try {
-        const pdfData = fs.readFileSync(pdfPath);
-        const base64Pdf = pdfData.toString("base64");
-        PdfImagePanel.createOrShow(context, pdfFileName, base64Pdf);
+        PdfImagePanel.createOrShow(context, pdfFileName, pdfUri);
       } catch (error: any) {
         vscode.window.showErrorMessage(
           `Failed to open PDF: ${error.message || error}`,

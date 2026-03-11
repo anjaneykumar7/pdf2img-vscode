@@ -1,0 +1,14 @@
+{
+  "name": "test-hello-ext",
+  "displayName": "Hello Test",
+  "description": "A test extension",
+  "version": "0.0.1",
+  "publisher": "anjaneykumar",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onCommand:test.hello"],
+  "contributes": {
+    "commands": [{ "command": "test.hello", "title": "Hello Test" }]
+  }
+}

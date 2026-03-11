@@ -1,89 +1,32 @@
-# PDF to Images — VS Code Extension
+# PDF to Images
 
-<p align="center">
-  <img src="landing/preview.png" alt="PDF to Images preview" width="700">
-</p>
+Convert PDF files to high-quality images directly within Visual Studio Code! This extension provides a custom PDF viewer that renders PDF pages as images and allows you to easily save or copy them.
 
-<p align="center">
-  <strong>Open any PDF in VS Code as a beautiful image gallery.</strong><br>
-  Copy, zoom, navigate, and save — without leaving your editor.
-</p>
+## Features
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img">
-    <img src="https://img.shields.io/visual-studio-marketplace/v/anjaneykumar7.pdf2img?style=for-the-badge&logo=visual-studio-code&logoColor=white&label=VS%20Code&color=7C3AED" alt="VS Code Marketplace">
-  </a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img">
-    <img src="https://img.shields.io/visual-studio-marketplace/i/anjaneykumar7.pdf2img?style=for-the-badge&color=3B82F6" alt="Installs">
-  </a>
-  <img src="https://img.shields.io/badge/license-Closed%20Source-ef4444?style=for-the-badge" alt="License">
-</p>
+- **Custom Editor for PDFs:** Click on any `.pdf` file in the explorer to open it in a beautiful, dark-themed image gallery viewer.
+- **Copy Images:** Right-click on any page image and select "Copy Image" to quickly copy it to your clipboard.
+- **Save Images:** Save individual pages as PNG images to your local file system.
+- **Save All:** Export all pages of a PDF to a selected folder in one click.
+- **Zoom Controls:** Easily zoom in and out of the PDF pages using the built-in slider.
+- **Page Navigation:** Quickly jump to specific pages using the dot navigation menu.
 
----
+## Usage
 
-## ✨ Features
+1. Open a workspace containing `.pdf` files.
+2. Click on a `.pdf` file in the Explorer. It will open in the custom "PDF to Images" viewer.
+3. Wait for the pages to render.
+4. **Context Menu:** You can also right-click a `.pdf` file and select "PDF to Images: Convert PDF".
+5. **Right-Click inside Viewer:** Right-click any rendered page and select "Copy Image" to copy the image data or use the Save buttons on the cards.
 
-| Feature                   | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| 🖼️ **Gallery View**       | PDF pages displayed as a responsive image grid           |
-| 📋 **Right-Click Copy**   | Copy any page as an image to your clipboard instantly    |
-| 🔍 **Zoom Controls**      | Scale from 50% up to 300% with crisp rendering           |
-| 🧭 **Page Navigation**    | Jump to any page in large multi-page documents           |
-| 📄 **Native PDF Support** | Click any `.pdf` file — opens as a gallery automatically |
-| 💾 **Save as Image**      | Export individual pages as high-quality PNG files        |
+## Requirements
 
-## 🚀 Getting Started
+- Visual Studio Code v1.85.0 or later.
 
-### Install
+## Release Notes
 
-1. Open **VS Code**
-2. Go to the Extensions panel (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-3. Search for **"PDF to Images"**
-4. Click **Install**
+### 1.0.0
 
-Or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=anjaneykumar7.pdf2img).
-
-### Usage
-
-- **Open a PDF** — Click any `.pdf` file in your workspace. It opens as an image gallery by default.
-- **Right-click to copy** — Right-click any page thumbnail → **Copy Image**.
-- **Zoom** — Use the zoom slider or `+` / `-` buttons in the toolbar.
-- **Navigate** — Use page input or arrow buttons to jump between pages.
-- **Context menu** — Right-click a `.pdf` in the Explorer sidebar → **PDF to Images: Convert PDF**.
-
-## 🛠️ Commands
-
-| Command                      | Description                               |
-| ---------------------------- | ----------------------------------------- |
-| `PDF to Images: Convert PDF` | Open a PDF file as an image gallery       |
-| `Copy Image`                 | Copy the selected page image to clipboard |
-
-## 📦 Tech Stack
-
-- **TypeScript** — Extension logic
-- **pdfjs-dist** — PDF rendering engine
-- **esbuild** — Bundler
-- **VS Code Custom Editor API** — Native `.pdf` file association
-
-## 🏗️ Development
-
-```bash
-# Clone the repo
-git clone https://github.com/anjaneykumar7/pdf2img.git
-cd pdf2img
-
-# Install dependencies
-npm install
-
-# Start dev mode (watches for changes)
-npm run watch
-
-# Build for production
-npm run build
-```
-
-Press `F5` in VS Code to launch the Extension Development Host.
-
-## 📄 License
-
-This is closed-source software. All rights reserved © [anjaneykumar7](https://github.com/anjaneykumar7). Unauthorized copying, modification, or distribution is strictly prohibited.
+- Initial release of PDF to Images.
+- Implemented PDF to image rendering using PDF.js.
+- Added copy and save functionality for individual and multiple pages.

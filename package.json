@@ -2,11 +2,21 @@
   "name": "pdf2img",
   "displayName": "PDF to Images",
   "description": "Convert PDF files to images and copy any page image with right-click",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "license": "SEE LICENSE IN LICENSE",
   "publisher": "anjaneykumar",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anjaneykumar7/pdf2img-vscode.git"
+  },
+  "homepage": "https://github.com/anjaneykumar7/pdf2img-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/anjaneykumar7/pdf2img-vscode/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "icon.png",
   "categories": [
     "Other"
   ],
